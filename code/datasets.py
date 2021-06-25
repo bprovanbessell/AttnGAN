@@ -143,11 +143,14 @@ class TextDataset(data.Dataset):
         return filename_bbox
 
     def load_captions(self, data_dir, filenames):
+        print("FILENAMES")
+        print(filenames)
         all_captions = []
         for i in range(len(filenames)):
             cap_path = '%s/text/%s.txt' % (data_dir, filenames[i])
             with open(cap_path, "r") as f:
-                captions = f.read().decode('utf8').split('\n')
+                # captions = f.read().decode('utf8').split('\n')
+                captions = f.read().split('\n')
                 cnt = 0
                 for cap in captions:
                     if len(cap) == 0:
@@ -224,6 +227,9 @@ class TextDataset(data.Dataset):
             train_captions = self.load_captions(data_dir, train_names)
             test_captions = self.load_captions(data_dir, test_names)
 
+            print("TRAIN CAPTIONS")
+            print(train_captions)
+
             train_captions, test_captions, ixtoword, wordtoix, n_words = \
                 self.build_dictionary(train_captions, test_captions)
             with open(filepath, 'wb') as f:
@@ -268,7 +274,18 @@ class TextDataset(data.Dataset):
 
     def get_caption(self, sent_ix):
         # a list of indices for a sentence
-        sent_caption = np.asarray(self.captions[sent_ix]).astype('int64')
+        
+        #print(sent_ix)
+        
+        #print(len(self.captions))
+        try:
+            sent_caption = np.asarray(self.captions[sent_ix]).astype('int64')
+
+        except:
+            print(sent_ix)
+            print(len(self.captions))
+
+            sent_caption = np.asarray(self.captions[sent_ix-2]).astype('int64')
         if (sent_caption == 0).sum() > 0:
             print('ERROR: do not need END (0) token', sent_caption)
         num_words = len(sent_caption)
@@ -298,7 +315,10 @@ class TextDataset(data.Dataset):
             bbox = None
             data_dir = self.data_dir
         #
-        img_name = '%s/images/%s.jpg' % (data_dir, key)
+        if "dilbert" in data_dir:
+            img_name = '%s/images/%s.png' % (data_dir, key)
+        else:
+            img_name = '%s/images/%s.jpg' % (data_dir, key)
         imgs = get_imgs(img_name, self.imsize,
                         bbox, self.transform, normalize=self.norm)
         # random select a sentence

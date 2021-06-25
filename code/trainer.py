@@ -16,6 +16,7 @@ from miscc.utils import weights_init, load_params, copy_G_params
 from model import G_DCGAN, G_NET
 from datasets import prepare_data
 from model import RNN_ENCODER, CNN_ENCODER
+from comic_model import COMIC_CNN_ENCODER
 
 from miscc.losses import words_loss
 from miscc.losses import discriminator_loss, generator_loss, KL_loss
@@ -23,6 +24,8 @@ import os
 import time
 import numpy as np
 import sys
+import json
+import matplotlib.pyplot as plt
 
 # ################# Text to image task############################ #
 class condGANTrainer(object):
@@ -33,8 +36,9 @@ class condGANTrainer(object):
             mkdir_p(self.model_dir)
             mkdir_p(self.image_dir)
 
-        torch.cuda.set_device(cfg.GPU_ID)
-        cudnn.benchmark = True
+        if cfg.CUDA:
+            torch.cuda.set_device(cfg.GPU_ID)
+            cudnn.benchmark = True
 
         self.batch_size = cfg.TRAIN.BATCH_SIZE
         self.max_epoch = cfg.TRAIN.MAX_EPOCH
@@ -45,13 +49,17 @@ class condGANTrainer(object):
         self.data_loader = data_loader
         self.num_batches = len(self.data_loader)
 
-    def build_models(self):
+    def build_models(self, comic_cnn=True):
         # ###################encoders######################################## #
         if cfg.TRAIN.NET_E == '':
             print('Error: no pretrained text-image encoders')
             return
 
-        image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
+        if comic_cnn:
+            image_encoder = COMIC_CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
+
+        else:
+            image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
         img_encoder_path = cfg.TRAIN.NET_E.replace('text_encoder', 'image_encoder')
         state_dict = \
             torch.load(img_encoder_path, map_location=lambda storage, loc: storage)
@@ -227,8 +235,12 @@ class condGANTrainer(object):
         fixed_noise = Variable(torch.FloatTensor(batch_size, nz).normal_(0, 1))
         if cfg.CUDA:
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
-
+        
         gen_iterations = 0
+
+        g_losses = []
+        d_losses = []
+
         # gen_iterations = start_epoch * self.num_batches
         for epoch in range(start_epoch, self.max_epoch):
             start_t = time.time()
@@ -320,11 +332,30 @@ class condGANTrainer(object):
                   % (epoch, self.max_epoch, self.num_batches,
                      errD_total.item(), errG_total.item(),
                      end_t - start_t))
+            
+            g_losses.append(errG_total.item())
+            d_losses.append(errD_total.item())
 
             if epoch % cfg.TRAIN.SNAPSHOT_INTERVAL == 0:  # and epoch != 0:
                 self.save_model(netG, avg_param_G, netsD, epoch)
+                
+                #import matplotlib.pyplot as plt
+                plt.plot(g_losses)
+                plt.plot(d_losses)
+                plt.legend(['generator loss', 'discriminator loss'], loc='lower right')
+                plt.savefig("../models/gen_disc_loss" + str(epoch) + ".png")
+
+                with open("g_d_losses_{}.json".format(epoch), 'w+') as js_file:
+                    res = {"g_losses": g_losses, "d_losses": d_losses}
+                    json.dump(res, js_file)
 
         self.save_model(netG, avg_param_G, netsD, self.max_epoch)
+
+        #import matplotlib.pyplot as plt
+        plt.plot(g_losses)
+        plt.plot(d_losses)
+        plt.legend(["generator loss", "discriminator loss"], loc='lower right')
+        plt.savefig("../models/gen_disc_loss.png")
 
     def save_singleimages(self, images, filenames, save_dir,
                           split_dir, sentenceID=0):
@@ -365,7 +396,8 @@ class condGANTrainer(object):
                 torch.load(cfg.TRAIN.NET_E, map_location=lambda storage, loc: storage)
             text_encoder.load_state_dict(state_dict)
             print('Load text encoder from:', cfg.TRAIN.NET_E)
-            text_encoder = text_encoder.cuda()
+            if cfg.CUDA:
+                text_encoder = text_encoder.cuda()
             text_encoder.eval()
 
             batch_size = self.batch_size
@@ -373,7 +405,8 @@ class condGANTrainer(object):
 
             with torch.no_grad():
                 noise = Variable(torch.FloatTensor(batch_size, nz))
-                noise = noise.cuda()
+                if cfg.CUDA:
+                    noise = noise.cuda()
 
             model_dir = cfg.TRAIN.NET_G
             state_dict = \
@@ -442,7 +475,8 @@ class condGANTrainer(object):
                 torch.load(cfg.TRAIN.NET_E, map_location=lambda storage, loc: storage)
             text_encoder.load_state_dict(state_dict)
             print('Load text encoder from:', cfg.TRAIN.NET_E)
-            text_encoder = text_encoder.cuda()
+            if cfg.CUDA:
+                text_encoder = text_encoder.cuda()
             text_encoder.eval()
 
             # the path to save generated images
@@ -456,7 +490,8 @@ class condGANTrainer(object):
                 torch.load(model_dir, map_location=lambda storage, loc: storage)
             netG.load_state_dict(state_dict)
             print('Load G from: ', model_dir)
-            netG.cuda()
+            if cfg.CUDA:
+                netG.cuda()
             netG.eval()
             for key in data_dic:
                 save_dir = '%s/%s' % (s_tmp, key)
@@ -470,13 +505,15 @@ class condGANTrainer(object):
                     captions = Variable(torch.from_numpy(captions))
                     cap_lens = Variable(torch.from_numpy(cap_lens))
 
-                    captions = captions.cuda()
-                    cap_lens = cap_lens.cuda()
+                    if cfg.CUDA:
+                        captions = captions.cuda()
+                        cap_lens = cap_lens.cuda()
 
                 for i in range(1):  # 16
                     with torch.no_grad():
                         noise = Variable(torch.FloatTensor(batch_size, nz))
-                        noise = noise.cuda()
+                        if cfg.CUDA:
+                            noise = noise.cuda()
                     #######################################################
                     # (1) Extract text embeddings
                     ######################################################

@@ -9,6 +9,7 @@ from datasets import TextDataset
 from datasets import prepare_data
 
 from model import RNN_ENCODER, CNN_ENCODER
+from comic_model import COMIC_CNN_ENCODER
 
 import os
 import sys
@@ -100,11 +101,11 @@ def train(dataloader, cnn_model, rnn_model, batch_size,
         if step % UPDATE_INTERVAL == 0:
             count = epoch * len(dataloader) + step
 
-            s_cur_loss0 = s_total_loss0[0] / UPDATE_INTERVAL
-            s_cur_loss1 = s_total_loss1[0] / UPDATE_INTERVAL
+            s_cur_loss0 = s_total_loss0 / UPDATE_INTERVAL
+            s_cur_loss1 = s_total_loss1 / UPDATE_INTERVAL
 
-            w_cur_loss0 = w_total_loss0[0] / UPDATE_INTERVAL
-            w_cur_loss1 = w_total_loss1[0] / UPDATE_INTERVAL
+            w_cur_loss0 = w_total_loss0 / UPDATE_INTERVAL
+            w_cur_loss1 = w_total_loss1 / UPDATE_INTERVAL
 
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | ms/batch {:5.2f} | '
@@ -157,16 +158,20 @@ def evaluate(dataloader, cnn_model, rnn_model, batch_size):
         if step == 50:
             break
 
-    s_cur_loss = s_total_loss[0] / step
-    w_cur_loss = w_total_loss[0] / step
+    s_cur_loss = s_total_loss / step
+    w_cur_loss = w_total_loss / step
 
     return s_cur_loss, w_cur_loss
 
 
-def build_models():
+def build_models(comic_cnn=True):
     # build model ############################################################
     text_encoder = RNN_ENCODER(dataset.n_words, nhidden=cfg.TEXT.EMBEDDING_DIM)
-    image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
+
+    if comic_cnn:
+        image_encoder = COMIC_CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
+    else:
+        image_encoder = CNN_ENCODER(cfg.TEXT.EMBEDDING_DIM)
     labels = Variable(torch.LongTensor(range(batch_size)))
     start_epoch = 0
     if cfg.TRAIN.NET_E != '':
@@ -228,8 +233,9 @@ if __name__ == "__main__":
     mkdir_p(model_dir)
     mkdir_p(image_dir)
 
-    torch.cuda.set_device(cfg.GPU_ID)
-    cudnn.benchmark = True
+    if cfg.CUDA:
+        torch.cuda.set_device(cfg.GPU_ID)
+        cudnn.benchmark = True
 
     # Get data loader ##################################################
     imsize = cfg.TREE.BASE_SIZE * (2 ** (cfg.TREE.BRANCH_NUM-1))

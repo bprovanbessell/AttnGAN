@@ -1,3 +1,14 @@
+# DescriptionGAN 
+
+- modified version of AttnGAN (see below) for generating Dilbert Comics from text.
+
+Usage:
+* Use scripts in data-prep-and-analysis to generate text-image dataset.
+* To use the comics CNN image encoder, change comic_cnn to True in create_model methods in 
+pretrain_DAMSM.py and trainer.py. To use the original Inceptionv3 based image encoder, set comics_cnn to False.
+* Edit yml files for pretraining DAMSM, training the AttnGAN, and evaluation.
+* Follow instructions as below with the respective yml comfig files to train models.
+
 # AttnGAN (Python 3, Pytorch 1.0)
 
 Pytorch implementation for reproducing AttnGAN results in the paper [AttnGAN: Fine-Grained Text to Image Generation

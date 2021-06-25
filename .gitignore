@@ -4,3 +4,11 @@ code/*.pyc
 code/miscc/*.pyc
 .DS_Store
 .idea/
+data/*/images
+old_models
+models/gen*
+models/dilb*
+models/*.pth
+code/json_equal_old
+code/json_losses_transcribed_old
+
