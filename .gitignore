@@ -12,3 +12,5 @@ models/*.pth
 code/json_equal_old
 code/json_losses_transcribed_old
 models
+data/*
+DAMSMencoders/*
